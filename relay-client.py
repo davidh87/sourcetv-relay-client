@@ -50,6 +50,14 @@ def listRelays():
 
     return jsonify(relays)
 
+@app.route('/relays/<relayId>', methods=['GET'])
+def listSingleRelay(relayId):
+    relayServer = sourcetvRelayServer.getRelayById(relayId)
+    if relayServer is None:
+        return Response(status=404)
+
+    return jsonify(relayServer)
+
 
 @app.route('/relays/<relayId>/stop', methods=['POST'])
 def stopRelayServer(relayId):
@@ -70,6 +78,8 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     deploymentOptions = configOptions[args.config[0]]
+
+    sourcetvRelayServer.init()
 
     app.debug = True
     app.run(host='0.0.0.0', port=5001)

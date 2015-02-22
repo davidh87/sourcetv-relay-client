@@ -2,6 +2,7 @@
 
 import time
 import sqlite3
+import subprocess
 
 DATABASE_FILE = 'relays.db'
 
@@ -15,7 +16,8 @@ def setupDatabase():
         sourceTvPassword text, 
         localPort integer,
         startTime integer,
-        active integer
+        active integer,
+        processId integer
         ) """)
     conn.commit()
 
@@ -28,7 +30,7 @@ def getRelayById(relayId):
     conn = sqlite3.connect(DATABASE_FILE)
     c = conn.cursor()
     c.execute("""
-        SELECT id, sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active
+        SELECT id, sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active, processId
         FROM relays 
         WHERE id = ?
         """, (relayId, ))
@@ -42,14 +44,15 @@ def getRelayById(relayId):
             "sourceTvPassword": row[3],
             "localPort": row[4],
             "startTime": row[5],
-            "active": row[6]
+            "active": row[6],
+            "processId": row[7]
         }
 
 def getActiveRelayServers():
     conn = sqlite3.connect(DATABASE_FILE)
     c = conn.cursor()
     c.execute("""
-        SELECT id, sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active
+        SELECT id, sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active, processId
         FROM relays 
         WHERE active = 1
         """)
@@ -63,7 +66,8 @@ def getActiveRelayServers():
             "sourceTvPassword": row[3],
             "localPort": row[4],
             "startTime": row[5],
-            "active": row[6]
+            "active": row[6],
+            "processId": row[7]
         }
 
         relays.append(relay)
@@ -84,18 +88,23 @@ def startRelayServer(sourceTvIP, sourceTvPort, sourceTvPassword):
     localPort = getLocalPort()
     startTime = int(time.time())
 
+    pid = subprocess.Popen(["nohup", "/Users/davidh/Documents/tf2center/relays/srcds_run", "-game", "tf", "-console", 
+        "+tv_enable", "\"1\"", "+tv_port", "%s" % (localPort), "+tv_relay", 
+        "%s:%s" % (sourceTvIP, sourceTvPort)]).pid
+
     conn = sqlite3.connect(DATABASE_FILE)
     c = conn.cursor()
     c.execute("""
-        INSERT INTO relays (sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active)
-        VALUES (?, ?, ?, ?, ?, 1)
+        INSERT INTO relays (sourceTvIP, sourceTvPort, sourceTvPassword, localPort, startTime, active, processId)
+        VALUES (?, ?, ?, ?, ?, 1, ?)
         """, 
         (
             sourceTvIP,
             sourceTvPort,
             sourceTvPassword,
             localPort,
-            startTime
+            startTime,
+            pid
         ))
 
     relayId = c.lastrowid
@@ -124,11 +133,12 @@ def stopRelayServer(relayServer):
     c = conn.cursor()
     c.execute("""
         UPDATE relays
-        SET active=0
+        SET active=0, processId=NULL
         WHERE id = ?
         """, (relayServer['id'],))
     conn.commit()
 
     return True
 
-setupDatabase()
+def init():
+    setupDatabase()
